@@ -14,15 +14,25 @@ st.set_page_config(
 # Check if model files exist
 @st.cache_resource
 def load_model():
-    try:
-        model = joblib.load('placement_model.pkl')
-        columns = joblib.load('columns.pkl')
-        num_cols = joblib.load('num_cols.pkl')
-        cat_cols = joblib.load('cat_cols.pkl')
-        return model, columns, num_cols, cat_cols
-    except FileNotFoundError:
-        st.error("❌ Model files not found! Please run save_model.py first.")
-        st.stop()
+    # First check if model files exist
+    if not os.path.exists('placement_model.pkl'):
+        st.warning("⚠️ Model files not found. Training model now... (this may take a few minutes)")
+        
+        # Run the training script
+        try:
+            import subprocess
+            subprocess.run(['python', 'save_model.py'], check=True)
+            st.success("✅ Model trained successfully!")
+        except:
+            st.error("❌ Could not train model automatically. Please ensure your data file is available.")
+            st.stop()
+    
+    # Load the model
+    model = joblib.load('placement_model.pkl')
+    columns = joblib.load('columns.pkl')
+    num_cols = joblib.load('num_cols.pkl')
+    cat_cols = joblib.load('cat_cols.pkl')
+    return model, columns, num_cols, cat_cols
 
 # Load model
 try:

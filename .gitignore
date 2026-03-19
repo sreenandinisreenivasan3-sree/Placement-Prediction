@@ -1,0 +1,12 @@
+# Model files
+*.pkl
+*.joblib
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment
+.env
+venv/
+env/
