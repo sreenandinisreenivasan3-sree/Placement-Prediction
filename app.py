@@ -69,13 +69,14 @@ with col1:
     age = st.number_input("Age", 18, 30, 21)
     city_tier = st.selectbox("City Tier", ["Tier 1", "Tier 2", "Tier 3"])
     
-    st.subheader("Academic Background")
+    st.subheader("Academic Background - School")
     ssc_percentage = st.slider("SSC Percentage", 50.0, 100.0, 75.0, 0.5)
     ssc_board = st.selectbox("SSC Board", ["State Board", "CBSE", "ICSE"])
     hsc_percentage = st.slider("HSC Percentage", 50.0, 100.0, 75.0, 0.5)
     hsc_board = st.selectbox("HSC Board", ["State Board", "CBSE", "ICSE"])
     hsc_stream = st.selectbox("HSC Stream", ["Science", "Commerce", "Arts"])
     
+    st.subheader("Academic Background - Higher Education")
     degree_percentage = st.slider("Degree Percentage", 50.0, 100.0, 75.0, 0.5)
     degree_field = st.selectbox("Degree Field", ["Engineering", "Science", "Commerce", "Arts"])
     mba_percentage = st.slider("MBA Percentage", 50.0, 100.0, 75.0, 0.5)
@@ -97,33 +98,47 @@ with col2:
     extracurricular_activities = st.number_input("Extracurricular Activities", 0, 10, 2)
     backlogs = st.number_input("Number of Backlogs", 0, 20, 0)
 
+# Function to encode categorical variables
+def encode_categorical(value, category_type):
+    """Encode categorical variables to numeric"""
+    encoding_map = {
+        'gender': {'Male': 1, 'Female': 0},
+        'city_tier': {'Tier 1': 1, 'Tier 2': 2, 'Tier 3': 3},
+        'ssc_board': {'State Board': 1, 'CBSE': 2, 'ICSE': 3},
+        'hsc_board': {'State Board': 1, 'CBSE': 2, 'ICSE': 3},
+        'hsc_stream': {'Science': 1, 'Commerce': 2, 'Arts': 3},
+        'degree_field': {'Engineering': 1, 'Science': 2, 'Commerce': 3, 'Arts': 4},
+        'specialization': {'Marketing': 1, 'Finance': 2, 'HR': 3, 'IT': 4, 'Operations': 5, 'None': 0}
+    }
+    return encoding_map.get(category_type, {}).get(value, 0)
+
 # Predict button
 if st.button("🔮 Predict Placement Chance", type="primary", use_container_width=True):
-    # Prepare input data with all required features
+    # Prepare input data with proper encoding
     input_data = {
-        'gender': 1 if gender == "Male" else 0,  # Encode as numeric
-        'age': age,
-        'city_tier': int(city_tier.split()[1]),  # Extract tier number
-        'ssc_percentage': ssc_percentage,
-        'ssc_board': ssc_board,
-        'hsc_percentage': hsc_percentage,
-        'hsc_board': hsc_board,
-        'hsc_stream': hsc_stream,
-        'degree_percentage': degree_percentage,
-        'degree_field': degree_field,
-        'mba_percentage': mba_percentage,
-        'specialization': specialization,
-        'internships_count': internships_count,
-        'projects_count': projects_count,
-        'certifications_count': certifications_count,
-        'technical_skills_score': technical_skills_score,
-        'soft_skills_score': soft_skills_score,
-        'aptitude_score': aptitude_score,
-        'communication_score': communication_score,
-        'work_experience_months': work_experience_months,
-        'leadership_roles': leadership_roles,
-        'extracurricular_activities': extracurricular_activities,
-        'backlogs': backlogs
+        'gender': encode_categorical(gender, 'gender'),
+        'age': float(age),
+        'city_tier': encode_categorical(city_tier, 'city_tier'),
+        'ssc_percentage': float(ssc_percentage),
+        'ssc_board': encode_categorical(ssc_board, 'ssc_board'),
+        'hsc_percentage': float(hsc_percentage),
+        'hsc_board': encode_categorical(hsc_board, 'hsc_board'),
+        'hsc_stream': encode_categorical(hsc_stream, 'hsc_stream'),
+        'degree_percentage': float(degree_percentage),
+        'degree_field': encode_categorical(degree_field, 'degree_field'),
+        'mba_percentage': float(mba_percentage),
+        'specialization': encode_categorical(specialization, 'specialization'),
+        'internships_count': int(internships_count),
+        'projects_count': int(projects_count),
+        'certifications_count': int(certifications_count),
+        'technical_skills_score': int(technical_skills_score),
+        'soft_skills_score': int(soft_skills_score),
+        'aptitude_score': int(aptitude_score),
+        'communication_score': int(communication_score),
+        'work_experience_months': int(work_experience_months),
+        'leadership_roles': int(leadership_roles),
+        'extracurricular_activities': int(extracurricular_activities),
+        'backlogs': int(backlogs)
     }
     
     # Create DataFrame
@@ -136,6 +151,9 @@ if st.button("🔮 Predict Placement Chance", type="primary", use_container_widt
     
     # Reorder columns to match training data
     input_df = input_df[feature_columns]
+    
+    # Convert all columns to numeric, replace any NaN with 0
+    input_df = input_df.apply(pd.to_numeric, errors='coerce').fillna(0)
     
     # Make prediction
     try:
@@ -198,7 +216,9 @@ if st.button("🔮 Predict Placement Chance", type="primary", use_container_widt
         
         recommendations = []
         if ssc_percentage < 70:
-            recommendations.append("📚 Improve your academic scores")
+            recommendations.append("📚 Improve your SSC percentage (target 70%+)")
+        if hsc_percentage < 70:
+            recommendations.append("📚 Improve your HSC percentage (target 70%+)")
         if degree_percentage < 70:
             recommendations.append("🎓 Focus on improving your degree percentage")
         if technical_skills_score < 70:
@@ -215,6 +235,10 @@ if st.button("🔮 Predict Placement Chance", type="primary", use_container_widt
             recommendations.append("🏢 Consider internships or entry-level positions for experience")
         if backlogs > 0:
             recommendations.append("📖 Clear your backlogs to improve academic standing")
+        if certifications_count < 2:
+            recommendations.append("📜 Earn more certifications in your field")
+        if leadership_roles == 0:
+            recommendations.append("👥 Take on leadership roles in student organizations")
         
         if recommendations:
             for rec in recommendations:
@@ -222,18 +246,20 @@ if st.button("🔮 Predict Placement Chance", type="primary", use_container_widt
         else:
             st.write("🌟 Excellent profile! You're well-prepared for placements. Keep maintaining your performance.")
         
-        # Show input summary
-        with st.expander("View Input Summary"):
-            st.write("### Profile Summary")
-            summary_df = pd.DataFrame([input_data])
-            st.dataframe(summary_df)
+        # Show processed input data for debugging
+        with st.expander("View Processed Input Data"):
+            st.write("### Numeric Input Values")
+            display_df = pd.DataFrame([input_data])
+            st.dataframe(display_df)
+            st.write(f"Data types: {input_df.dtypes}")
             
     except Exception as e:
         st.error(f"Error making prediction: {str(e)}")
         st.write("Debug info:")
         st.write(f"Input DataFrame shape: {input_df.shape}")
-        st.write(f"Expected columns: {feature_columns[:5]}... (total {len(feature_columns)})")
-        st.write(f"Input columns: {input_df.columns.tolist()}")
+        st.write(f"Data types: {input_df.dtypes}")
+        st.write(f"Any NaN values: {input_df.isnull().any().any()}")
+        st.write(f"Sample values: {input_df.iloc[0].to_dict()}")
 
 # Footer
 st.markdown("---")
