@@ -51,7 +51,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("Personal Information")
     
-    gender = st.selectbox("Gender", ["Male", "Female","Other])
+    gender = st.selectbox("Gender", ["Male", "Female","Other"])
     age = st.number_input("Age", min_value=18, max_value=60, value=23)
     city_tier = st.selectbox("City Tier", ["Tier 1", "Tier 2", "Tier 3"])
     
