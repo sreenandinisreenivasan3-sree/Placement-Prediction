@@ -1,269 +1,163 @@
 import streamlit as st
-import joblib
-import os
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
+import joblib
+import os
 
 # Page configuration
 st.set_page_config(
-    page_title="Placement Prediction System",
+    page_title="Campus Placement Predictor",
     page_icon="🎓",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Custom CSS
-st.markdown("""
-    <style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1E3A8A;
-        text-align: center;
-        padding: 1rem;
-    }
-    .prediction-box {
-        background-color: #10B981;
-        padding: 2rem;
-        border-radius: 10px;
-        text-align: center;
-        color: white;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# Title
-st.markdown('<h1 class="main-header">🎓 Campus Placement Prediction System</h1>', unsafe_allow_html=True)
-st.markdown("---")
-
-# Load model with caching
+# Check if model files exist
 @st.cache_resource
-def load_placement_model():
-    """Load the trained model and required components"""
-    try:
-        model = joblib.load('placement_model.pkl')
-        columns = joblib.load('columns.pkl')
-        return model, columns
-    except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
-        return None, None
+def load_model():
+    # First check if model files exist
+    if not os.path.exists('placement_model.pkl'):
+        st.warning("⚠️ Model files not found. Training model now... (this may take a few minutes)")
+        
+        # Run the training script
+        try:
+            import subprocess
+            subprocess.run(['python', 'save_model.py'], check=True)
+            st.success("✅ Model trained successfully!")
+        except:
+            st.error("❌ Could not train model automatically. Please ensure your data file is available.")
+            st.stop()
+    
+    # Load the model
+    model = joblib.load('placement_model.pkl')
+    columns = joblib.load('columns.pkl')
+    num_cols = joblib.load('num_cols.pkl')
+    cat_cols = joblib.load('cat_cols.pkl')
+    return model, columns, num_cols, cat_cols
 
-# Try to load model
-model, feature_columns = load_placement_model()
-
-if model is None:
-    st.error("❌ Model not loaded! Please train the model first.")
+# Load model
+try:
+    model, all_columns, num_cols, cat_cols = load_model()
+except:
+    st.warning("⚠️ Model not loaded. Please train the model first by running: python save_model.py")
     st.stop()
 
-st.success(f"✅ Model loaded successfully! Expecting {len(feature_columns)} features.")
+# Title
+st.title("🎓 Campus Placement Prediction System")
+st.markdown("### Predict your placement chances based on academic and personal details")
 
-# Create input form
-st.header("📊 Student Information")
-
-# Create two columns for input organization
+# Create two columns for input
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Personal Information")
+    
     gender = st.selectbox("Gender", ["Male", "Female","Other"])
-    age = st.number_input("Age", 18, 30, 21)
+    age = st.number_input("Age", min_value=18, max_value=30, value=22)
     city_tier = st.selectbox("City Tier", ["Tier 1", "Tier 2", "Tier 3"])
     
-    st.subheader("Academic Background - School")
-    ssc_percentage = st.slider("SSC Percentage", 50.0, 100.0, 75.0, 0.5)
-    ssc_board = st.selectbox("SSC Board", ["State Board", "CBSE", "ICSE"])
-    hsc_percentage = st.slider("HSC Percentage", 50.0, 100.0, 75.0, 0.5)
-    hsc_board = st.selectbox("HSC Board", ["State Board", "CBSE", "ICSE"])
-    hsc_stream = st.selectbox("HSC Stream", ["Science", "Commerce", "Arts"])
+    st.subheader("Academic Performance (School)")
+    ssc_percentage = st.number_input("SSC Percentage", min_value=0.0, max_value=100.0, value=70.0)
+    ssc_board = st.selectbox("SSC Board", ["Central", "State", "CBSE", "ICSE"])
     
-    st.subheader("Academic Background - Higher Education")
-    degree_percentage = st.slider("Degree Percentage", 50.0, 100.0, 75.0, 0.5)
-    degree_field = st.selectbox("Degree Field", ["Engineering", "Science", "Commerce", "Arts"])
-    mba_percentage = st.slider("MBA Percentage", 50.0, 100.0, 75.0, 0.5)
-    specialization = st.selectbox("Specialization", ["Marketing", "Finance", "HR", "IT", "Operations", "None"])
+    hsc_percentage = st.number_input("HSC Percentage", min_value=0.0, max_value=100.0, value=70.0)
+    hsc_board = st.selectbox("HSC Board", ["Central", "State", "CBSE", "ICSE"])
+    hsc_stream = st.selectbox("HSC Stream", ["Science", "Commerce", "Arts"])
 
 with col2:
+    st.subheader("Higher Education")
+    degree_percentage = st.number_input("Degree Percentage", min_value=0.0, max_value=100.0, value=70.0)
+    degree_field = st.selectbox("Degree Field", ["Sci&Tech", "Commerce", "Arts", "Management"])
+    
+    mba_percentage = st.number_input("MBA Percentage", min_value=0.0, max_value=100.0, value=60.0)
+    specialization = st.selectbox("MBA Specialization", 
+                                  ["Marketing & HR", "Marketing & Finance", "Finance & HR", "None"])
+    
     st.subheader("Experience & Skills")
-    internships_count = st.number_input("Number of Internships", 0, 5, 1)
-    projects_count = st.number_input("Number of Projects", 0, 10, 2)
-    certifications_count = st.number_input("Number of Certifications", 0, 10, 1)
-    
-    technical_skills_score = st.slider("Technical Skills Score", 0, 100, 70)
-    soft_skills_score = st.slider("Soft Skills Score", 0, 100, 70)
-    aptitude_score = st.slider("Aptitude Score", 0, 100, 70)
-    communication_score = st.slider("Communication Score", 0, 100, 70)
-    
-    work_experience_months = st.number_input("Work Experience (months)", 0, 60, 0)
-    leadership_roles = st.number_input("Leadership Roles", 0, 10, 0)
-    extracurricular_activities = st.number_input("Extracurricular Activities", 0, 10, 2)
-    backlogs = st.number_input("Number of Backlogs", 0, 20, 0)
+    work_experience_months = st.number_input("Work Experience (months)", min_value=0, max_value=60, value=0)
+    internships_count = st.number_input("Number of Internships", min_value=0, max_value=10, value=1)
+    projects_count = st.number_input("Number of Projects", min_value=0, max_value=20, value=3)
+    certifications_count = st.number_input("Number of Certifications", min_value=0, max_value=20, value=1)
 
-# Function to encode categorical variables
-def encode_categorical(value, category_type):
-    """Encode categorical variables to numeric"""
-    encoding_map = {
-        'gender': {'Male': 1, 'Female': 0},
-        'city_tier': {'Tier 1': 1, 'Tier 2': 2, 'Tier 3': 3},
-        'ssc_board': {'State Board': 1, 'CBSE': 2, 'ICSE': 3},
-        'hsc_board': {'State Board': 1, 'CBSE': 2, 'ICSE': 3},
-        'hsc_stream': {'Science': 1, 'Commerce': 2, 'Arts': 3},
-        'degree_field': {'Engineering': 1, 'Science': 2, 'Commerce': 3, 'Arts': 4},
-        'specialization': {'Marketing': 1, 'Finance': 2, 'HR': 3, 'IT': 4, 'Operations': 5, 'None': 0}
-    }
-    return encoding_map.get(category_type, {}).get(value, 0)
+# Third row for skills
+st.subheader("Skills & Achievements")
+col3, col4, col5 = st.columns(3)
 
-# Predict button
-if st.button("🔮 Predict Placement Chance", type="primary", use_container_width=True):
-    # Prepare input data with proper encoding
-    input_data = {
-        'gender': encode_categorical(gender, 'gender'),
-        'age': float(age),
-        'city_tier': encode_categorical(city_tier, 'city_tier'),
-        'ssc_percentage': float(ssc_percentage),
-        'ssc_board': encode_categorical(ssc_board, 'ssc_board'),
-        'hsc_percentage': float(hsc_percentage),
-        'hsc_board': encode_categorical(hsc_board, 'hsc_board'),
-        'hsc_stream': encode_categorical(hsc_stream, 'hsc_stream'),
-        'degree_percentage': float(degree_percentage),
-        'degree_field': encode_categorical(degree_field, 'degree_field'),
-        'mba_percentage': float(mba_percentage),
-        'specialization': encode_categorical(specialization, 'specialization'),
-        'internships_count': int(internships_count),
-        'projects_count': int(projects_count),
-        'certifications_count': int(certifications_count),
-        'technical_skills_score': int(technical_skills_score),
-        'soft_skills_score': int(soft_skills_score),
-        'aptitude_score': int(aptitude_score),
-        'communication_score': int(communication_score),
-        'work_experience_months': int(work_experience_months),
-        'leadership_roles': int(leadership_roles),
-        'extracurricular_activities': int(extracurricular_activities),
-        'backlogs': int(backlogs)
-    }
+with col3:
+    technical_skills_score = st.slider("Technical Skills Score", 0, 10, 6)
+    soft_skills_score = st.slider("Soft Skills Score", 0, 10, 6)
+    communication_score = st.slider("Communication Score", 0, 10, 6)
+
+with col4:
+    aptitude_score = st.slider("Aptitude Score", 0, 100, 60)
+    leadership_roles = st.number_input("Leadership Roles (count)", min_value=0, max_value=20, value=1)
+    extracurricular_activities = st.number_input("Extracurricular Activities", min_value=0, max_value=20, value=2)
+
+with col5:
+    backlogs = st.number_input("Number of Backlogs", min_value=0, max_value=20, value=0)
+
+# Prediction button
+if st.button("🎯 Predict Placement", type="primary", use_container_width=True):
     
-    # Create DataFrame
-    input_df = pd.DataFrame([input_data])
-    
-    # Ensure all required columns are present and in correct order
-    for col in feature_columns:
-        if col not in input_df.columns:
-            input_df[col] = 0
-    
-    # Reorder columns to match training data
-    input_df = input_df[feature_columns]
-    
-    # Convert all columns to numeric, replace any NaN with 0
-    input_df = input_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+    # Create input dataframe
+    input_data = pd.DataFrame([[  
+        gender, age, city_tier, ssc_percentage, ssc_board,
+        hsc_percentage, hsc_board, hsc_stream, degree_percentage,
+        degree_field, mba_percentage, specialization,
+        internships_count, projects_count, certifications_count,
+        technical_skills_score, soft_skills_score, aptitude_score,
+        communication_score, work_experience_months, leadership_roles,
+        extracurricular_activities, backlogs
+    ]], columns=all_columns)
     
     # Make prediction
-    try:
-        prediction = model.predict(input_df)[0]
-        probability = model.predict_proba(input_df)[0][1]
-        
-        # Display results
-        st.markdown("---")
-        st.header("🎯 Prediction Result")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if prediction == 1:
-                st.markdown("""
-                    <div class="prediction-box">
-                        <h2>✅ LIKELY TO BE PLACED</h2>
-                        <p>Congratulations! High chance of placement</p>
-                    </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown("""
-                    <div class="prediction-box" style="background-color: #EF4444;">
-                        <h2>⚠️ NEEDS IMPROVEMENT</h2>
-                        <p>Low chance of placement based on current profile</p>
-                    </div>
-                """, unsafe_allow_html=True)
-        
-        with col2:
-            st.metric("Placement Probability", f"{probability*100:.1f}%")
-        
-        with col3:
-            # Create gauge chart
-            fig = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=probability*100,
-                title={'text': "Success Rate"},
-                domain={'x': [0, 1], 'y': [0, 1]},
-                gauge={
-                    'axis': {'range': [0, 100]},
-                    'bar': {'color': "#10B981"},
-                    'steps': [
-                        {'range': [0, 40], 'color': "#EF4444"},
-                        {'range': [40, 70], 'color': "#F59E0B"},
-                        {'range': [70, 100], 'color': "#10B981"}
-                    ],
-                    'threshold': {
-                        'line': {'color': "red", 'width': 4},
-                        'thickness': 0.75,
-                        'value': probability*100
-                    }
-                }
-            ))
-            fig.update_layout(height=250)
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Recommendations
-        st.markdown("---")
-        st.subheader("📝 Recommendations for Improvement")
-        
-        recommendations = []
-        if ssc_percentage < 70:
-            recommendations.append("📚 Improve your SSC percentage (target 70%+)")
-        if hsc_percentage < 70:
-            recommendations.append("📚 Improve your HSC percentage (target 70%+)")
-        if degree_percentage < 70:
-            recommendations.append("🎓 Focus on improving your degree percentage")
-        if technical_skills_score < 70:
-            recommendations.append("💻 Enhance your technical skills through online courses")
-        if soft_skills_score < 70:
-            recommendations.append("🗣️ Work on communication and soft skills")
-        if internships_count == 0:
-            recommendations.append("💼 Apply for internships to gain practical experience")
-        if projects_count < 2:
-            recommendations.append("🛠️ Build more projects to showcase your skills")
-        if aptitude_score < 70:
-            recommendations.append("📝 Practice aptitude tests regularly")
-        if work_experience_months == 0 and internships_count == 0:
-            recommendations.append("🏢 Consider internships or entry-level positions for experience")
-        if backlogs > 0:
-            recommendations.append("📖 Clear your backlogs to improve academic standing")
-        if certifications_count < 2:
-            recommendations.append("📜 Earn more certifications in your field")
-        if leadership_roles == 0:
-            recommendations.append("👥 Take on leadership roles in student organizations")
-        
-        if recommendations:
-            for rec in recommendations:
-                st.write(rec)
+    prediction = model.predict(input_data)[0]
+    probability = model.predict_proba(input_data)[0][1]
+    
+    # Display result
+    st.markdown("---")
+    st.subheader("📊 Prediction Result")
+    
+    result_col1, result_col2 = st.columns(2)
+    
+    with result_col1:
+        if prediction == 1:
+            st.success(f"### ✅ You are LIKELY to be placed!")
         else:
-            st.write("🌟 Excellent profile! You're well-prepared for placements. Keep maintaining your performance.")
-        
-        # Show processed input data for debugging
-        with st.expander("View Processed Input Data"):
-            st.write("### Numeric Input Values")
-            display_df = pd.DataFrame([input_data])
-            st.dataframe(display_df)
-            st.write(f"Data types: {input_df.dtypes}")
-            
-    except Exception as e:
-        st.error(f"Error making prediction: {str(e)}")
-        st.write("Debug info:")
-        st.write(f"Input DataFrame shape: {input_df.shape}")
-        st.write(f"Data types: {input_df.dtypes}")
-        st.write(f"Any NaN values: {input_df.isnull().any().any()}")
-        st.write(f"Sample values: {input_df.iloc[0].to_dict()}")
+            st.error(f"### ❌ You are UNLIKELY to be placed")
+    
+    with result_col2:
+        st.metric("Placement Probability", f"{probability:.1%}")
+        st.progress(int(probability * 100))
+    
+    # Additional insights
+    st.markdown("---")
+    st.subheader("🔍 Insights")
+    
+    if probability > 0.7:
+        st.info("🌟 Excellent chances! Focus on maintaining your skills.")
+    elif probability > 0.4:
+        st.warning("📈 Moderate chances. Consider improving your skills or gaining more experience.")
+    else:
+        st.warning("💪 Your chances are lower. Try to work on your academics, skills, and experience.")
 
-# Footer
-st.markdown("---")
-st.markdown(
-    "<p style='text-align: center; color: gray;'>Powered by Machine Learning | Placement Prediction System</p>",
-    unsafe_allow_html=True
-)
+# Sidebar with info
+with st.sidebar:
+    st.image("https://img.icons8.com/color/96/000000/student-center.png", width=80)
+    st.header("About")
+    st.info("""
+    This app predicts campus placement based on:
+    - Academic performance
+    - Skills & certifications
+    - Work experience
+    - Personal factors
+    
+    Model: XGBoost (Optimized)
+    """)
+    
+    st.header("💡 Tips")
+    st.markdown("""
+    - Higher scores = better chances
+    - Internships & projects help
+    - Certifications boost probability
+    - Keep backlogs to minimum
+    """)
